@@ -2,14 +2,14 @@
 """Oracle-ideal noise study (Section 3.5 of the manuscript).
 
 Isolates the inverse-QFT stage from the modular-exponentiation oracle:
-  - Full QFT & Deferred SQFT: exact t-qubit density matrix obtained by tracing
+- Full QFT & Deferred SQFT: exact t-qubit density matrix obtained by tracing
     out the target register from the ideal post-oracle pure state, followed by
     noisy transpiled inverse-QFT stage in Qiskit Aer.
-  - Recycled SQFT: exact classical-branching density-matrix simulation using
-    noise.py, where each controlled modular multiplication is a noiseless
-    'unitary' step, resets suffer X errors with probability p, and each
-    recorded measurement bit flips with probability p.
-  - Also evaluates a measurement-only channel (noiseless gates, bit-flip p on
+- Recycled SQFT: exact classical-branching density-matrix simulation using
+    noise.py, where each controlled modular multiplication is a single opaque
+    noiseless 'unitary' step, resets suffer X errors with probability p, and
+    each recorded measurement bit flips with probability p.
+- Also evaluates a measurement-only channel (noiseless gates, bit-flip p on
     recorded outcomes) to isolate mid-circuit feedback sensitivity.
 
 Writes results_oracle_ideal/oracle_ideal_summary.csv.
@@ -22,7 +22,7 @@ import time
 import numpy as np
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, transpile
 from qiskit.circuit.library import QFTGate, UnitaryGate
-from qiskit.quantum_info import DensityMatrix, Statevector, partial_trace
+from qiskit.quantum_info import Statevector, partial_trace
 from qiskit_aer import AerSimulator
 
 from noise import (
@@ -50,17 +50,19 @@ def rev_int(x, t):
     return int(format(x, f"0{t}b")[::-1], 2)
 
 
-def controlled_mod_mult(a, e, N, n):
-    """Controlled permutation |y> -> |a^e y mod N>, identity when a^e = 1 mod N."""
+def controlled_mod_mult_opaque(a, e, N, n):
+    """Single opaque (n+1)-qubit UnitaryGate for controlled |y> -> |a^e y mod N>."""
     mult = pow(a, e, N)
     if mult == 1:
         return None
-    dim = 2 ** n
-    P = np.zeros((dim, dim), dtype=complex)
-    for y in range(dim):
+    dim_t = 2 ** n
+    dim = 2 * dim_t
+    U = np.eye(dim, dtype=complex)
+    for y in range(dim_t):
         z = (mult * y) % N if y < N else y
-        P[z, y] = 1.0
-    return UnitaryGate(P, label=f"U^{e}").control(1)
+        U[2 * y + 1, 2 * y + 1] = 0.0
+        U[2 * z + 1, 2 * y + 1] = 1.0
+    return UnitaryGate(U, label=f"cU^{e}")
 
 
 def post_oracle_reduced_dm(N, a, n, t):
@@ -71,11 +73,10 @@ def post_oracle_reduced_dm(N, a, n, t):
     qc.x(tgt[0])
     qc.h(cnt)
     for j in range(t):
-        g = controlled_mod_mult(a, 2 ** j, N, n)
+        g = controlled_mod_mult_opaque(a, 2 ** j, N, n)
         if g is not None:
             qc.append(g, [cnt[j], *tgt])
     sv = Statevector(qc)
-    # Trace out target qubits [t, ..., t + n - 1]
     return partial_trace(sv, list(range(t, t + n)))
 
 
@@ -85,10 +86,7 @@ def build_iqft_stage(t, kind):
     if kind == "qft":
         qc.append(QFTGate(t).inverse(), range(t))
     elif kind == "sqft":
-        for j in reversed(range(t)):
-            qc.h(j)
-            for k in range(j + 1, t):
-                qc.cp(-math.pi / 2 ** (k - j), k, j)
+        qc.append(QFTGate(t).inverse(), range(t))
     else:
         raise ValueError(kind)
     return transpile(qc, basis_gates=BASIS, optimization_level=1, seed_transpiler=1)
@@ -109,32 +107,37 @@ def run_stage_dm(rho_in, tq_stage, t, reverse, nm):
     return dist
 
 
+def _basis_1q(gate_fn):
+    """Transpile a single-qubit gate (h or p(theta)) into BASIS = ['rz', 'sx', 'x', 'cx']."""
+    tmp = QuantumCircuit(1)
+    gate_fn(tmp)
+    return transpile(tmp, basis_gates=BASIS, optimization_level=1, seed_transpiler=1)
+
+
 def build_recyc_oracle_ideal(N, a, n, t):
-    """Recycled circuit with opaque 'unitary' oracle steps so only QFT/reset/meas are noisy."""
+    """Recycled circuit with BASIS 1q gates and opaque 'unitary' oracle steps."""
     anc = QuantumRegister(1, "anc")
     tgt = QuantumRegister(n, "tgt")
     c = ClassicalRegister(t, "c")
     qc = QuantumCircuit(anc, tgt, c)
     qc.x(tgt[0])
+    h_basis = _basis_1q(lambda q: q.h(0))
+
     for j in reversed(range(t)):
         qc.reset(anc[0])
-        qc.h(anc[0])
-        g = controlled_mod_mult(a, 2 ** j, N, n)
+        qc.compose(h_basis, [anc[0]], inplace=True)
+        g = controlled_mod_mult_opaque(a, 2 ** j, N, n)
         if g is not None:
             qc.append(g, [anc[0], *tgt])
         for k in range(j + 1, t):
+            ang = -math.pi / 2 ** (k - j)
+            p_basis = _basis_1q(lambda q, th=ang: q.p(th, 0))
             with qc.if_test((c[t - 1 - k], 1)):
-                qc.p(-math.pi / 2 ** (k - j), anc[0])
-        qc.h(anc[0])
+                qc.compose(p_basis, [anc[0]], inplace=True)
+        qc.compose(h_basis, [anc[0]], inplace=True)
         qc.measure(anc[0], c[t - 1 - j])
 
-    # Transpile only non-unitary gates while preserving 'unitary' oracle steps as opaque
-    return transpile(
-        qc,
-        basis_gates=BASIS + ["unitary", "reset", "measure", "if_else"],
-        optimization_level=1,
-        seed_transpiler=1,
-    )
+    return qc
 
 
 def main():
@@ -159,7 +162,7 @@ def main():
         tq_sqft = build_iqft_stage(t, "sqft")
 
         ideal_full = run_stage_dm(rho_cnt, tq_full, t, False, aer_noise_model("depolarizing", 0.0))
-        ideal_sqft = run_stage_dm(rho_cnt, tq_sqft, t, True, aer_noise_model("depolarizing", 0.0))
+        ideal_sqft = run_stage_dm(rho_cnt, tq_sqft, t, False, aer_noise_model("depolarizing", 0.0))
         _, _, pf0 = eval_metrics(ideal_full)
         print(f"Ideal P_fact={pf0:.6f}, TVD(sqft, full)={tvd(ideal_sqft, ideal_full):.2e}", flush=True)
 
@@ -190,16 +193,14 @@ def main():
             print(f"  {circ:6s} {ch:16s} p={p:<7g} P_peak={pk:.4f} P_fact={pf:.4f} "
                   f"ret={pf/pf0:.3f} TVD={tvd(dist, ideal_full):.4f}", flush=True)
 
-        # Gate channels (depolarizing & bitflip; recycled also gets reset_p = p)
         for ch in ("depolarizing", "bitflip"):
             for p in GATE_RATES:
                 nm = aer_noise_model(ch, p)
                 record("qft", ch, p, run_stage_dm(rho_cnt, tq_full, t, False, nm))
-                record("sqft", ch, p, run_stage_dm(rho_cnt, tq_sqft, t, True, nm))
+                record("sqft", ch, p, run_stage_dm(rho_cnt, tq_sqft, t, False, nm))
                 dist_r = simulate(rec_steps, nq_rec, ncl_rec, ch, p, readout=0.0, reset_p=p)
                 record("recyc", ch, p, dist_r)
 
-        # Measurement-only channel (isolates mid-circuit readout + feedback cost)
         for p in MEAS_ONLY_RATES:
             record("qft", "measurement_only", p, flip(ideal_full, t, p))
             record("sqft", "measurement_only", p, flip(ideal_sqft, t, p))
