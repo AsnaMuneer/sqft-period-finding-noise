@@ -1,0 +1,20 @@
+{
+  "qiskit": "1.4.6",
+  "qiskit_aer": "0.15.1",
+  "python": "3.12.16",
+  "method": "exact density-matrix probabilities (no sampling, no seeds)",
+  "shots_assumed_for_intervals": 4096,
+  "noise_model": "sx, x: depolarizing or X-flip; cx: two-qubit depolarizing or single-qubit X on either qubit; rz error-free (main results). Readout: symmetric, applied exactly to the ideal distribution.",
+  "semiclassical_form": "deferred measurement (all measurements at the end)",
+  "bit_convention": "x = sum_j c[j] 2^j, c[0] least significant",
+  "good_outcomes": [
+    0,
+    64,
+    128,
+    192
+  ],
+  "useful_outcomes": [
+    64,
+    192
+  ]
+}
