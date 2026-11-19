@@ -1,14 +1,18 @@
-Noise sensitivity of semiclassical and qubit-recycled QFT in period finding
+# **Noise sensitivity of semiclassical and qubit-recycled QFT in period finding**
 
-Exact density-matrix simulation code, analytical validation scripts, plotting routines, and numerical results for a noise study of three counting-register designs used in period finding (the quantum stage of Shor's algorithm):
-- Full QFT (baseline): standard inverse QFT with swaps.
-- Semiclassical QFT (SQFT): Griffiths–Niu inverse QFT in deferred-measurement form (and hardware classically conditioned form for the latency/idle study).
-- Recycled SQFT: one counting qubit reused across rounds, with mid-circuit measurement, reset and classical feedback.
+Exact simulation code and results for a noise study of three counting-register designs used in period finding (the quantum stage of Shor's algorithm):
 
-The instances are N = 15 (a = 7) and N = 21 (a = 2), with transpiled resource scaling evaluated up to N = 51. The paper is in main_jpdc.tex (submitted to Journal of Parallel and Distributed Computing).
+- **Full QFT (baseline):** standard inverse QFT with swaps.
+- **Semiclassical QFT (SQFT):** Griffiths–Niu inverse QFT in deferred-measurement form (and hardware classically conditioned form for the latency and idle-decoherence study).
+- **Recycled SQFT:** one counting qubit reused across rounds, with mid-circuit measurement, reset and classical feedback.
 
-Repository layout
+The instances are $N = 15$ ($a = 7$) and $N = 21$ ($a = 2$), with transpiled resource counts evaluated for $N = 15, 21, 35, 39, 51$. The paper is in `main_jpdc.tex` (submitted to *Journal of Parallel and Distributed Computing*).
 
+---
+
+## **Repository layout**
+
+```text
 code/                       scripts (run from inside this folder)
   noise.py                  shared noise channels, branching simulator, metrics
   sqft_benchmark.py         N = 15 circuit builders, bit convention, Monte Carlo benchmark
@@ -31,85 +35,118 @@ code/                       scripts (run from inside this folder)
 results_final/              final exact sweep (N = 15, full QFT and SQFT)
 results_exact/              earlier exact sweep (superseded)
 results_recyc/              recycled design, exact, N = 15 (oracle-noise model)
-results_resources/          resource counts for N = 15, 21, 35, 39, 51
+results_resources/          resource counts for all N
 results_recyc_scaling/      recycled design at N = 15 and 21 (oracle-noise model, reduced sweep)
-results_oracle_ideal/       oracle-ideal study at N = 15 and 21
+results_oracle_ideal/       oracle-ideal study (see below)
+```
 
-Environment
+---
 
-Python 3.12 with the versions in code/requirements.txt:
-- qiskit 1.4.6
-- qiskit-aer 0.15.1
-- numpy, matplotlib
+## **Environment**
+
+Python 3.12 with the versions in `code/requirements.txt`:
+
+- `qiskit==1.4.6`
+- `qiskit-aer==0.15.1`
+- `numpy`
+- `matplotlib`
 
 Set up:
+
+```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r code/requirements.txt
+```
 
-Results were produced on macOS (Apple silicon). Exact density-matrix runs are CPU-bound and memory-light (< 1 GB RAM) for N = 15 and N = 21, though multi-round classical branching at N = 21 (2^10 = 1024 branches) takes ~1–3 hours depending on circuit decomposition.
+Results were produced on macOS (Apple silicon). Exact density-matrix runs are CPU-bound and memory-light for $N = 15$, and require ~1–3 GB of RAM at $N = 21$.
 
-Reproducing the results
+---
 
-Run every script from inside code/, because the scripts import each other by file name. Outputs are written relative to the folder the script is run from.
+## **Reproducing the results**
 
-Result                                      Script                 Expected output                                  Approximate time
-Final N = 15 sweep (full QFT, SQFT)         sweep_final.py         results_final/exact_summary.csv                  30–45 min
-Earlier N = 15 sweep                        sweep_exact.py         results_exact/exact_summary.csv                  30–45 min
-Recycled design, N = 15                     recyc_exact.py         results_recyc/recyc_exact.csv                    15 min
-Resource counts                             resource_scaling.py    results_resources/resources.csv                  < 1 min
-Recycled design, N = 15 & 21 (reduced)      recyc_scaling.py       results_recyc_scaling/recyc_scaling.csv          ~3 hours
-Oracle-ideal study                          oracle_ideal_study.py  results_oracle_ideal/oracle_ideal_summary.csv    ~1.5 hours
-Feedback latency & T1/T2 idle sweep         run_grid2.py           stdout / grid2_results.txt                       ~3 min
-Proposition 3 analytical bound check        check_bound.py         stdout verification                              < 1 min
-Paper figures (Figures 1–4 + Rz)            make_plots.py          figures, charts/*.pdf                            < 5 sec
+Run every script from inside `code/`, because the scripts import each other by file name. Outputs are written relative to the folder the script is run from.
+
+| Result | Script | Expected output | Approximate time |
+| :--- | :--- | :--- | :--- |
+| Final $N = 15$ sweep (full QFT, SQFT; Table 2) | `sweep_final.py` | `results_final/exact_summary.csv` | 30–45 min |
+| Earlier $N = 15$ sweep | `sweep_exact.py` | `results_exact/exact_summary.csv` | 30–45 min |
+| Recycled design, $N = 15$ (Table 3) | `recyc_exact.py` | `results_recyc/recyc_exact.csv` | 15 min |
+| Resource counts (Table 4) | `resource_scaling.py` | `results_resources/resources.csv` | 1 min |
+| Recycled design, $N = 15$ & $21$ (reduced; Section 5.4) | `recyc_scaling.py` | `results_recyc_scaling/recyc_scaling.csv` | several hours |
+| Oracle-ideal study (Section 3.5) | `oracle_ideal_study.py` | `results_oracle_ideal/oracle_ideal_summary.csv` | ~1.5 hours |
+| Feedback latency & $T_1/T_2$ idle sweep (Table 5) | `run_grid2.py` | stdout / `grid2_results.txt` | ~3 min |
+| Proposition 3 analytical noise bound check | `check_bound.py` | stdout verification | < 1 min |
+| Per-peak breakdown ($N = 15$ recycled) | `check_peaks.py` | stdout verification | ~3 min |
+| Paper figures (Figures 1–4 + $R_z$ sensitivity) | `make_plots.py` | `figures, charts/*.pdf` | < 5 sec |
 
 Example:
+
+```bash
 cd code
 python sweep_final.py
+```
 
-Noise models
+---
+
+## **Noise models**
 
 The repository contains three noise and timing models. The paper reports them separately.
 
-1. Oracle-noise model (recyc_exact.py, recyc_scaling.py, sweep_final.py). The modular-multiplication oracle is compiled to the basis gates {rz, sx, x, cx}, so its gates receive noise like every other gate. This is the primary model behind the N = 15 results (Tables 2–3).
-2. Oracle-ideal model (oracle_ideal_study.py). The oracle is a single ideal unitary step. Noise acts only on the inverse-QFT stage gates, measurements, and resets. This model was introduced because, at N = 21, the oracle's compiled CX count is large enough that the oracle-noise model drives the output close to uniform at depolarizing rate 1e-3.
-3. Feedback-latency and idle-decoherence model (latency_model.py, sim_idle.py, run_grid2.py). Evaluates the inverse-QFT stage on an ASAP schedule (1q: 35 ns, CX: 300 ns, measurement: 800 ns) with depolarizing gate errors (eps1 = 1e-3, eps2 = 1e-2) and T1 = T2 amplitude/phase damping during idle periods across classical feedback latencies L (Section 6, Table 5).
+1. **Oracle-noise model (`recyc_exact.py`, `recyc_scaling.py`, `sweep_final.py`).** The modular-multiplication oracle is compiled to the basis gates `{rz, sx, x, cx}`, so its gates receive noise like every other gate. This is the model behind the $N = 15$ results (Tables 2–3) and the $N = 21$ recycled scaling benchmark (Section 5.4).
+2. **Oracle-ideal model (`oracle_ideal_study.py`).** The oracle is a single ideal unitary step. Noise acts only on the QFT-stage gates, on measurements, and on resets. This model was introduced because, at $N = 21$, the oracle's compiled CX count is large enough that the oracle-noise model randomises the output at depolarizing rate `1e-3`.
+3. **Feedback-latency and idle-decoherence model (`latency_model.py`, `sim_idle.py`, `run_grid2.py`).** Evaluates the inverse-QFT stage on an ASAP schedule (single-qubit gate: 35 ns, CX: 300 ns, measurement: 800 ns) with gate depolarizing errors ($\varepsilon_1 = 10^{-3}$, $\varepsilon_2 = 10^{-2}$) and $T_1 = T_2$ amplitude/phase damping during idle windows as a function of classical feedback latency $L$ (Section 6, Table 5).
 
-Gate and readout conventions (models 1 and 2):
-- Depolarizing, convention B (checked against Qiskit Aer 0.15.1): single-qubit error probability 3p/4, uniform over X, Y, Z; two-qubit error probability 15p/16.
-- Bit-flip: X with probability p on single-qubit gates; on CX, X on the control or the target with probability p/2 each.
-- rz gates are error-free in the main results. A sensitivity variant adds bit-flip errors after rz.
-- Readout is symmetric. For the full QFT and SQFT it is applied analytically to the final distribution. For the recycled design it is applied at each mid-circuit measurement.
+### **Gate and readout conventions (models 1 and 2)**
 
-Validation
+- **Depolarizing, convention B (checked against Qiskit Aer 0.15.1):** single-qubit error probability $3p/4$, uniform over $X, Y, Z$; two-qubit error probability $15p/16$, uniform over all 15 non-identity two-qubit Paulis.
+- **Bit-flip:** $X$ with probability $p$ on single-qubit gates (`sx`, `x`); on `cx`, $X$ on the control or the target with probability $p/2$ each.
+- **`rz` gates:** error-free in the main results. A sensitivity variant (`bitflip +rz`) adds bit-flip errors after `rz`.
+- **Readout:** symmetric bit-flip with probability $p$. For the full QFT and SQFT it is applied analytically to the final distribution. For the recycled design it is applied at each mid-circuit measurement, propagating into classical feedback.
 
-- Ideal equivalence. For N = 15 the ideal distributions of all three designs agree to total-variation distance 0.000000 (2.01e-13 in the recycled branching simulator). For N = 21 the recycled design agrees with the full QFT to 4.53e-12.
-- Analytical bound check. check_bound.py verifies that every noisy distribution in results_final/exact_summary.csv satisfies Proposition 3 (TVD <= 1 - w).
-- Per-peak breakdown. check_peaks.py shows that the small excess of the recycled design's factoring probability above 0.5 at low noise comes from probability moving out of the non-factoring peak at x = 128 into the factoring peaks at x = 64 and x = 192.
+---
 
-Bit convention
+## **Validation**
 
-x = sum_j c[j] 2^j, with c[0] the least significant bit. The swap-free designs store round j in classical bit c[t-1-j], which restores the same convention as the full QFT. The ideal equivalence test above checks this.
+- **Ideal equivalence.** For $N = 15$ the ideal distributions of all three designs agree to total-variation distance `0.000000` (`2.01e-13` in the recycled branching simulator). For $N = 21$ the recycled design agrees with the full QFT to `4.53e-12`.
+- **Regression.** `sweep_final.py` and `sweep_exact.py` reproduce their existing CSVs to printed precision after the refactor into `noise.py`.
+- **Analytical bound check.** `check_bound.py` verifies that every noisy distribution in `results_final/exact_summary.csv` satisfies Proposition 3 ($\mathrm{TVD} \le 1 - w$).
+- **Per-peak breakdown.** `check_peaks.py` shows that the small excess of the recycled design's factoring probability above `0.5` at low noise comes from probability moving out of the non-factoring peak at $x = 128$ into the factoring peaks at $x = 64$ and $x = 192$.
 
-Metrics
+---
 
-- P_peak: probability of a period-consistent outcome (x such that x/2^t is near s/r).
-- P_useful: probability of the outcomes with gcd(s, r) = 1, i.e. the ones that yield factors in the ideal case.
-- P_fact: probability that continued-fraction post-processing of x/2^t yields a non-trivial factor of N.
-- Intervals are 95% Wilson intervals at an assumed budget of 4096 shots. The reported probabilities are exact, not sampled.
+## **Bit convention**
 
-Limitations
+$$x = \sum_{j=0}^{t-1} c_j 2^j$$
 
-- Full three-design noisy comparisons are limited to N = 15 (a = 7); N = 21 (a = 2) evaluates the recycled design under the oracle-noise model and all three designs under the oracle-ideal model.
+with $c_0$ the least significant bit. The swap-free designs store round $j$ in classical bit $c_{t-1-j}$, which restores the same convention as the full QFT. The ideal equivalence test above checks this.
+
+---
+
+## **Metrics**
+
+- **`P_peak`:** probability of a period-consistent outcome ($x$ such that $x/2^t$ is near $s/r$).
+- **`P_useful`:** probability of the outcomes with $\gcd(s, r) = 1$, i.e. the ones that yield factors in the ideal case.
+- **`P_fact`:** probability that continued-fraction post-processing of $x/2^t$ yields a non-trivial factor of $N$.
+- **Intervals:** 95% Wilson intervals at an assumed budget of 4096 shots. The reported probabilities are exact, not sampled.
+
+---
+
+## **Limitations**
+
+- Full three-design noisy comparisons under the oracle-noise model are limited to $N = 15$ ($a = 7$); $N = 21$ ($a = 2$) evaluates the recycled design under the oracle-noise model and all three designs under the oracle-ideal model. The full QFT at $N = 21$ is not in the exact oracle-noise sweep.
 - The noise models are idealised. They do not include calibrated gate fidelities, crosstalk, or readout asymmetry.
 - The modular-exponentiation oracle is a permutation unitary for the given modulus, not a general reversible modular-exponentiation circuit.
 - No hardware results are included.
 
-Citation
+---
+
+## **Citation**
 
 Citation details will be added on acceptance.
 
-Licence
+---
+
+## **Licence**
 
 To be added before public release.
