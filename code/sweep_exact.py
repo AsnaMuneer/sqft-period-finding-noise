@@ -1,3 +1,8 @@
+"""Exact density-matrix sweep, earlier model (bit-flip on single-qubit gates only).
+
+Superseded by sweep_final.py for the paper. Kept so results_exact/ can be reproduced.
+Shared helpers (tvd, wilson, readout flip) now come from noise.py.
+"""
 import csv
 import math
 import os
@@ -7,9 +12,10 @@ import numpy as np
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, transpile
 from qiskit_aer import AerSimulator
 
+from noise import flip, tvd, wilson
 from sqft_benchmark import (BASIS, GOOD, N_COUNT, N_TARGET, SWEEPS, USEFUL,
                             build_circuit, controlled_power_gate, factor_found,
-                            noise_model, rev_int, wilson)
+                            noise_model, rev_int)
 
 OUT = "results_exact"
 N_SHOTS = 4096   # shots assumed when computing sampling intervals
@@ -60,24 +66,11 @@ def exact_dist(circ, reverse, channel, p):
     return dist
 
 
-def readout_dist(dist, p):
-    """Exact effect of symmetric readout error, applied bit by bit."""
-    T = np.array([[1 - p, p], [p, 1 - p]])
-    M = np.array([[1.0]])
-    for _ in range(N_COUNT):
-        M = np.kron(M, T)
-    return M @ dist
-
-
 def metrics(dist):
     pk = sum(dist[x] for x in GOOD)
     pu = sum(dist[x] for x in USEFUL)
     pf = sum(dist[x] for x in range(2 ** N_COUNT) if factor_found(x))
     return pk, pu, pf
-
-
-def tvd_arr(a, b):
-    return 0.5 * float(np.abs(a - b).sum())
 
 
 def main():
@@ -92,7 +85,7 @@ def main():
         t0 = time.time()
         ideal[name] = exact_dist(circ, rev, "none", 0)
         print(f"{name} ideal done ({time.time() - t0:.0f} s)", flush=True)
-    print(f"exact TVD sqft vs qft (ideal): {tvd_arr(ideal['sqft'], ideal['qft']):.6f}",
+    print(f"exact TVD sqft vs qft (ideal): {tvd(ideal['sqft'], ideal['qft']):.6f}",
           flush=True)
 
     rows = []
@@ -100,7 +93,7 @@ def main():
     def add(name, form, channel, p, dist):
         pk, pu, pf = metrics(dist)
         lo, hi = wilson(round(pf * N_SHOTS), N_SHOTS)
-        tv = tvd_arr(dist, ideal[name])
+        tv = tvd(dist, ideal[name])
         rows.append(dict(circuit=name, form=form, channel=channel, p=p,
                          P_peak=round(pk, 6), P_useful=round(pu, 6),
                          P_fact=round(pf, 6), P_fact_lo=round(lo, 6),
@@ -112,7 +105,7 @@ def main():
     for name, form, circ, rev in designs:
         add(name, form, "none", 0.0, ideal[name])
         for p in SWEEPS["readout"]:
-            add(name, form, "readout", p, readout_dist(ideal[name], p))
+            add(name, form, "readout", p, flip(ideal[name], N_COUNT, p))
         for channel in ["depolarizing", "bitflip"]:
             for p in SWEEPS[channel]:
                 add(name, form, channel, p, exact_dist(circ, rev, channel, p))
