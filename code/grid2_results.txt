@@ -1,0 +1,23 @@
+
+T1 = T2 = 20 us   full: makespan 19.52 us  P_peak=0.6982  P_fact=0.2271
+  L= 0.00 us  sqft: makespan   7.42 us  P_peak=0.9865  P_fact=0.3796  (full - sqft = -0.1525)
+  L= 0.50 us  sqft: makespan  10.91 us  P_peak=0.9867  P_fact=0.3274  (full - sqft = -0.1002)
+  L= 1.00 us  sqft: makespan  14.41 us  P_peak=0.9869  P_fact=0.2824  (full - sqft = -0.0552)
+  L= 2.00 us  sqft: makespan  21.41 us  P_peak=0.9872  P_fact=0.2103  (full - sqft = +0.0169)
+  L= 5.00 us  sqft: makespan  42.41 us  P_peak=0.9879  P_fact=0.0879  (full - sqft = +0.1393)
+
+T1 = T2 = 50 us   full: makespan 19.52 us  P_peak=0.6654  P_fact=0.3022
+  L= 0.00 us  sqft: makespan   7.42 us  P_peak=0.9863  P_fact=0.4446  (full - sqft = -0.1424)
+  L= 0.50 us  sqft: makespan  10.91 us  P_peak=0.9864  P_fact=0.4190  (full - sqft = -0.1168)
+  L= 1.00 us  sqft: makespan  14.41 us  P_peak=0.9864  P_fact=0.3948  (full - sqft = -0.0926)
+  L= 2.00 us  sqft: makespan  21.41 us  P_peak=0.9866  P_fact=0.3507  (full - sqft = -0.0485)
+  L= 5.00 us  sqft: makespan  42.41 us  P_peak=0.9870  P_fact=0.2460  (full - sqft = +0.0562)
+
+T1 = T2 = 100 us   full: makespan 19.52 us  P_peak=0.6538  P_fact=0.3329
+  L= 0.00 us  sqft: makespan   7.42 us  P_peak=0.9862  P_fact=0.4687  (full - sqft = -0.1357)
+  L= 0.50 us  sqft: makespan  10.91 us  P_peak=0.9862  P_fact=0.4549  (full - sqft = -0.1220)
+  L= 1.00 us  sqft: makespan  14.41 us  P_peak=0.9863  P_fact=0.4416  (full - sqft = -0.1087)
+  L= 2.00 us  sqft: makespan  21.41 us  P_peak=0.9864  P_fact=0.4162  (full - sqft = -0.0832)
+  L= 5.00 us  sqft: makespan  42.41 us  P_peak=0.9866  P_fact=0.3484  (full - sqft = -0.0154)
+
+elapsed 158 s
