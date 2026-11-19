@@ -1,3 +1,9 @@
+"""Final exact sweep for the paper: full QFT and deferred semiclassical QFT, N = 15.
+
+Noise model: sx, x depolarizing or bit-flip; cx depolarizing or X on either qubit;
+rz error-free (main results). Readout is applied analytically. Shared channels,
+readout and metrics helpers come from noise.py.
+"""
 import csv
 import json
 import os
@@ -12,30 +18,16 @@ import qiskit
 import qiskit_aer
 from qiskit import transpile
 from qiskit_aer import AerSimulator
-from qiskit_aer.noise import NoiseModel, depolarizing_error, pauli_error
+from qiskit_aer.noise import NoiseModel
 
+from noise import aer_noise_model, flip, tvd, wilson
 from sqft_benchmark import (BASIS, GOOD, N_COUNT, SWEEPS, USEFUL,
-                            build_circuit, rev_int, wilson)
-from sweep_exact import (sqft_deferred, strip_measurements, metrics, tvd_arr,
-                         readout_dist)
+                            build_circuit, rev_int)
+from sweep_exact import metrics, sqft_deferred, strip_measurements
 
 OUT = "results_final"
 N_SHOTS = 4096          # shots assumed for sampling intervals
 RZ_RATES = [0.001, 0.005, 0.02]
-
-
-def noise_model(channel, p, rz=False):
-    """Noise model used in the paper. rz is error-free unless rz=True (sensitivity only)."""
-    nm = NoiseModel()
-    one_q = ["sx", "x"] + (["rz"] if rz else [])
-    if channel == "depolarizing":
-        nm.add_all_qubit_quantum_error(depolarizing_error(p, 1), one_q)
-        nm.add_all_qubit_quantum_error(depolarizing_error(p, 2), ["cx"])
-    elif channel == "bitflip":
-        nm.add_all_qubit_quantum_error(pauli_error([("X", p), ("I", 1 - p)]), one_q)
-        nm.add_all_qubit_quantum_error(
-            pauli_error([("XI", p / 2), ("IX", p / 2), ("II", 1 - p)]), ["cx"])
-    return nm
 
 
 def exact(circ, reverse, nm):
@@ -99,7 +91,7 @@ def main():
         ideal[name] = exact(circ, rev, NoiseModel())
         print(f"{name} ideal done ({time.time() - t0:.0f} s), sum={ideal[name].sum():.6f}",
               flush=True)
-    print(f"exact TVD sqft vs qft (ideal): {tvd_arr(ideal['sqft'], ideal['qft']):.6f}",
+    print(f"exact TVD sqft vs qft (ideal): {tvd(ideal['sqft'], ideal['qft']):.6f}",
           flush=True)
 
     rows = []
@@ -107,7 +99,7 @@ def main():
     def add(name, form, channel, p, dist):
         pk, pu, pf = metrics(dist)
         lo, hi = wilson(round(pf * N_SHOTS), N_SHOTS)
-        tv = tvd_arr(dist, ideal[name])
+        tv = tvd(dist, ideal[name])
         rows.append(dict(circuit=name, form=form, channel=channel, p=p,
                          P_peak=round(pk, 6), P_useful=round(pu, 6),
                          P_fact=round(pf, 6), P_fact_lo=round(lo, 6),
@@ -119,16 +111,16 @@ def main():
     for name, form, circ, rev in designs:
         add(name, form, "none", 0.0, ideal[name])
         for p in SWEEPS["readout"]:
-            add(name, form, "readout", p, readout_dist(ideal[name], p))
+            add(name, form, "readout", p, flip(ideal[name], N_COUNT, p))
         for p in SWEEPS["depolarizing"]:
             add(name, form, "depolarizing", p,
-                exact(circ, rev, noise_model("depolarizing", p)))
+                exact(circ, rev, aer_noise_model("depolarizing", p)))
         for p in SWEEPS["bitflip"]:
-            add(name, form, "bitflip", p, exact(circ, rev, noise_model("bitflip", p)))
+            add(name, form, "bitflip", p, exact(circ, rev, aer_noise_model("bitflip", p)))
         # Sensitivity only: bit-flip with rz errors added
         for p in RZ_RATES:
             add(name, form, "bitflip +rz", p,
-                exact(circ, rev, noise_model("bitflip", p, rz=True)))
+                exact(circ, rev, aer_noise_model("bitflip", p, rz=True)))
 
     with open(os.path.join(OUT, "exact_summary.csv"), "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
